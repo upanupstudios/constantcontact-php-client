@@ -1,11 +1,11 @@
 <?php
 
-namespace Upanupstudios\Cyberimpact\Php\Client;
+namespace Upanupstudios\ConstantContact\Php\Client;
 
 use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\RequestException;
 
-class Cyberimpact
+class ConstantContact
 {
   /**
    * The Authorization URL.
