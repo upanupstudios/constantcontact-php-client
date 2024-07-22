@@ -5,107 +5,177 @@ namespace Upanupstudios\ConstantContact\Php\Client;
 use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\RequestException;
 
-class ConstantContact
-{
+/**
+ * The ConstantContact class.
+ */
+class ConstantContact {
+
   /**
    * The Authorization URL.
    *
-   * @var string $authorization_url
+   * @var string
    */
-  private $authorization_url = 'https://authz.constantcontact.com/oauth2/default/v1/authorize';
+  private $authorizationUrl = 'https://authz.constantcontact.com/oauth2/default/v1/authorize';
+
+  /**
+   * The Token URL.
+   *
+   * @var string
+   */
+  private $tokenUrl = 'https://authz.constantcontact.com/oauth2/default/v1/token';
 
   /**
    * The REST API URL.
    *
-   * @var string $api_url
+   * @var string
    */
-  private $api_url = 'https://api.cc.email/v3';
+  private $apiUrl = 'https://api.cc.email/v3';
 
+  /**
+   * The config instance.
+   *
+   * @var Config
+   */
+  private $config = NULL;
 
-  private $config;
-  private $httpClient;
+  /**
+   * The client instance.
+   *
+   * @var \GuzzleHttp\ClientInterface
+   */
+  private $httpClient = NULL;
 
-  public function __construct(Config $config, ClientInterface $httpClient)
-  {
-    $this->config = $config;
+  /**
+   * {@inheritdoc}
+   */
+  public function __construct(ClientInterface $httpClient, Config $config = NULL) {
     $this->httpClient = $httpClient;
+    $this->config = $config;
   }
 
-  public function getApiUrl()
-  {
-    return $this->api_url;
+  /**
+   * {@inheritdoc}
+   */
+  public function getApiUrl() {
+    return $this->apiUrl;
   }
 
-  public function getConfig(): Config
-  {
+  /**
+   * {@inheritdoc}
+   */
+  public function getConfig(): Config {
     return $this->config;
   }
 
-  function getAuthorizationURL($clientId, $redirectURI, $scope, $state) {
-    // Scope can be array.
-
-    // Create authorization URL
-    $authURL = $this->authorization_url . "?client_id=" . $clientId . "&scope=" . $scope . "+offline_access&response_type=code&state=" . $state . "&redirect_uri=" . $redirectURI;
+  /**
+   * {@inheritdoc}
+   */
+  public function getAuthorizationUrl($clientId, $redirectURI, $scope, $state) {
+    // @todo Scope can be array.
+    // Create authorization URL.
+    $authURL = $this->authorizationUrl . "?client_id=" . $clientId . "&scope=" . $scope . "&response_type=code&state=" . $state . "&redirect_uri=" . $redirectURI;
 
     return $authURL;
   }
 
-  public function request(string $method, string $uri, array $options = [])
-  {
-    try {
-      $defaultOptions = [
-        'headers' => [
-          'Accept' => 'application/json',
-          'Content-Type' => 'application/json',
-          'Authorization' => 'Bearer '.$this->config->getApiToken()
-        ]
-      ];
+  /**
+   * {@inheritdoc}
+   */
+  public function getAccessToken($redirectURI, $clientId, $clientSecret, $code) {
+    // Create full request URL.
+    $token_uri = $this->tokenUrl . '?code=' . $code . '&redirect_uri=' . $redirectURI . '&grant_type=authorization_code';
+    $credentials = base64_encode($clientId . ':' . $clientSecret);
 
-      if(!empty($options)) {
-        //TODO: This might not be a deep merge...
-        $options = array_merge($defaultOptions, $options);
-      } else {
+    return $this->request('POST', $token_uri, [
+      'headers' => [
+        'Accept' => 'application/json',
+        'Authorization' => 'Basic ' . $credentials,
+        'Cache-Control' => 'no-cache',
+        'Content-Type' => 'application/x-www-form-urlencoded',
+      ],
+    ]);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getRefreshToken($refreshToken, $clientId, $clientSecret) {
+    // Create full request URL.
+    $token_uri = $this->tokenUrl . '?refresh_token=' . $refreshToken . '&grant_type=refresh_token';
+    $credentials = base64_encode($clientId . ':' . $clientSecret);
+
+    return $this->request('POST', $token_uri, [
+      'headers' => [
+        'Accept' => 'application/json',
+        'Authorization' => 'Basic ' . $credentials,
+        'Cache-Control' => 'no-cache',
+        'Content-Type' => 'application/x-www-form-urlencoded',
+      ],
+    ]);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function request(string $method, string $url, array $options = []) {
+    try {
+      $defaultOptions = [];
+
+      if (!empty($this->config)) {
+        $defaultOptions = [
+          'headers' => [
+            'Accept' => 'application/json',
+            'Authorization' => 'Bearer ' . $this->config->getAccessToken(),
+            'Cache-Control' => 'no-cache',
+            'Content-Type' => 'application/json',
+          ],
+        ];
+      }
+
+      if (!empty($options)) {
+        $options = array_merge_recursive($defaultOptions, $options);
+      }
+      else {
         $options = $defaultOptions;
       }
 
-      $request = $this->httpClient->request($method, $this->api_url.'/'.$uri, $options);
-
-      $body = $request->getBody();
-      $response = $body->__toString();
-
-      // Return as array
-      $response = json_decode($response, TRUE);
-    } catch (\JsonException $exeption) {
-      $response = $exeption->getMessage();
-    } catch (RequestException $exception) {
-      $response = $exception->getMessage();
+      $response = $this->httpClient->request($method, $url, $options);
+    }
+    catch (RequestException $exception) {
+      $response = $exception->getResponse();
     }
 
-    return $response;
-  }
+    // Get body.
+    $body = $response->getBody();
+    $body = $body->__toString();
 
-  public function ping()
-  {
-    $response = $this->request('GET', 'ping');
+    // Return as array.
+    $response = json_decode($body, TRUE);
 
     return $response;
   }
 
   /**
-   * @return object
+   * Throws InvalidArgumentException if $class does not exist.
    *
    * @throws \InvalidArgumentException
-   *  If $class does not exist.
    */
-  public function api(string $class)
-  {
+  public function api(string $class) {
     switch ($class) {
-      case 'groups':
-        $api = new Groups($this);
+      case 'contacts':
+        $api = new Contacts($this);
         break;
 
-      case 'mailings':
-        $api = new Mailings($this);
+      case 'contactLists':
+        $api = new ContactLists($this);
+        break;
+
+      case 'emailCampaigns':
+        $api = new EmailCampaigns($this);
+        break;
+
+      case 'emailCampaignActivities':
+        $api = new EmailCampaignActivities($this);
         break;
 
       default:
@@ -115,12 +185,16 @@ class ConstantContact
     return $api;
   }
 
-  public function __call(string $name, array $args): object
-  {
+  /**
+   * {@inheritdoc}
+   */
+  public function __call(string $name, array $args): object {
     try {
       return $this->api($name);
-    } catch (\InvalidArgumentException $e) {
+    }
+    catch (\InvalidArgumentException $e) {
       throw new \BadMethodCallException("Undefined method called: '$name'.");
     }
   }
+
 }

@@ -9,6 +9,7 @@
       "email": "marcom@upanup.com"
     }
   ],
+  "version": "1.0",
   "require": {
       "guzzlehttp/guzzle": "^6.0 || ^7.0"
   },

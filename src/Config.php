@@ -2,31 +2,32 @@
 
 namespace Upanupstudios\ConstantContact\Php\Client;
 
-final class Config
-{
-  private $apiKey;
+/**
+ * The Config class.
+ */
+final class Config {
 
-  private $secret;
+  /**
+   * The Access Token.
+   *
+   * @var string
+   */
+  private $accessToken;
 
-  public function __construct(string $apiKey, string $secret)
+  /**
+   * {@inheritdoc}
+   */
+  public function __construct(string $accessToken)
   {
-    $this->apiKey = $apiKey;
-    $this->secret = $secret;
+    $this->accessToken = $accessToken;
   }
 
   /**
-   * Get API Key.
+   * Get Access Token.
    */
-  public function getApiKey(): string
+  public function getAccessToken(): string
   {
-    return $this->apiKey;
+    return $this->accessToken;
   }
 
-  /**
-   * Get Secret.
-   */
-  public function getSecret(): string
-  {
-    return $this->secret;
-  }
 }
